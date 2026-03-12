@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robotik Kol — CI/CD Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0e17;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin-top: 24px;
+            font-size: 1.6rem;
+            color: #00ff88;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 24px;
+            padding: 24px;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        canvas {
+            background: #101624;
+            border: 1px solid #1e2a3a;
+            border-radius: 12px;
+        }
+
+        .panel {
+            background: #101624;
+            border: 1px solid #1e2a3a;
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            min-width: 260px;
+            line-height: 1.8;
+        }
+
+        .panel .label { color: #6a7a8a; }
+        .panel .value { color: #00ff88; font-weight: bold; }
+        .panel .value.error { color: #ff4444; }
+
+        .pipeline {
+            width: 100%;
+            max-width: 1052px;
+            text-align: center;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            margin-bottom: 24px;
+            transition: all 0.5s;
+        }
+
+        .pipeline.success {
+            background: #0b2e1a;
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+
+        .pipeline.failure {
+            background: #2e0b0b;
+            border: 1px solid #ff4444;
+            color: #ff4444;
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        button {
+            background: #1a2233;
+            color: #c0d0e0;
+            border: 1px solid #2a3a4a;
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        button:hover { background: #243044; border-color: #00ff88; color: #00ff88; }
+        button.danger { border-color: #ff4444; color: #ff4444; }
+        button.danger:hover { background: #2e1515; }
+
+        footer {
+            color: #3a4a5a;
+            font-size: 0.8rem;
+            padding: 16px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🤖 Robotik Kol — CI/CD Demo</h1>
+
+<div class="controls">
+    <button onclick="animasyonBaslat()">▶ Otomatik Demo</button>
+    <button onclick="yukariKalk()">⬆ Yukarı</button>
+    <button onclick="asagiIn()">⬇ Aşağı</button>
+    <button onclick="solaGit()">⬅ Sola</button>
+    <button onclick="sagaGit()">➡ Sağa</button>
+    <button onclick="dondur()">🔄 Dön</button>
+    <button onclick="tutBirak()">✊ Tut/Bırak</button>
+    <button class="danger" onclick="masayiDegistir()">⚠ Masayı Yükselt</button>
+    <button onclick="sifirla()">↺ Sıfırla</button>
+</div>
+
+<div class="container">
+    <canvas id="sahne" width="700" height="450"></canvas>
+    <div class="panel" id="durum"></div>
+</div>
+
+<div class="pipeline success" id="pipeline">✅ Tüm testler geçti — Deploy başarılı</div>
+
+<footer>ALKÜ × NEXUS — CI/CD Bootcamp 2026</footer>
+
+<script>
+const canvas = document.getElementById('sahne');
+const ctx = canvas.getContext('2d');
+const durumPanel = document.getElementById('durum');
+const pipelineDiv = document.getElementById('pipeline');
+
+let kol = { x: 0, y: 0, aci: 0, tutuyorMu: false, masaYuksekligi: 10 };
+let hata = null;
+let carpiyor = false;
+let carpismaFrame = 0;
+
+function sifirla() {
+    kol = { x: 0, y: 0, aci: 0, tutuyorMu: false, masaYuksekligi: 10 };
+    hata = null;
+    carpiyor = false;
+    pipelineDiv.className = 'pipeline success';
+    pipelineDiv.textContent = '✅ Tüm testler geçti — Deploy başarılı';
+    ciz();
+}
+
+function yukariKalk(miktar = 2) {
+    if (kol.y + miktar > kol.masaYuksekligi) {
+        hata = "Kol masaya çarptı!";
+        carpiyor = true;
+        carpismaFrame = 0;
+        pipelineDiv.className = 'pipeline failure';
+        pipelineDiv.textContent = '❌ Kol masaya çarptı — Deploy engellendi';
+    } else {
+        kol.y += miktar;
+        hata = null;
+    }
+    ciz();
+}
+
+function asagiIn(miktar = 2) {
+    kol.y = Math.max(0, kol.y - miktar);
+    ciz();
+}
+
+function solaGit(miktar = 2) {
+    kol.x = Math.max(-10, kol.x - miktar);
+    ciz();
+}
+
+function sagaGit(miktar = 2) {
+    kol.x = Math.min(10, kol.x + miktar);
+    ciz();
+}
+
+function dondir() {
+    kol.aci = (kol.aci + 45) % 360;
+    ciz();
+}
+// alias
+function dondur() { dondir(); }
+
+function tutBirak() {
+    kol.tutuyorMu = !kol.tutuyorMu;
+    ciz();
+}
+
+function masayiDegistir() {
+    kol.masaYuksekligi = 3;
+    hata = null;
+    carpiyor = false;
+    pipelineDiv.className = 'pipeline success';
+    pipelineDiv.textContent = '⚠ Masa yükseltildi — masaYuksekligi: 10 → 3';
+    ciz();
+}
+
+function ciz() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Grid
+    ctx.strokeStyle = '#1a2030';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < canvas.width; i += 30) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+    }
+    for (let i = 0; i < canvas.height; i += 30) {
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+    }
+
+    const tabanX = 350;
+    const tabanY = 400;
+    const birimY = 25;
+    const birimX = 20;
+
+    // Masa
+    const masaPx = tabanY - kol.masaYuksekligi * birimY;
+    if (carpiyor && carpismaFrame % 2 === 0) {
+        ctx.fillStyle = '#ff4444';
+    } else {
+        ctx.fillStyle = '#8B5E3C';
+    }
+    ctx.fillRect(50, masaPx, canvas.width - 100, 12);
+    ctx.fillStyle = '#6a4a2a';
+    ctx.fillRect(50, masaPx, canvas.width - 100, 3);
+
+    // Masa etiketi
+    ctx.fillStyle = '#6a7a8a';
+    ctx.font = '11px monospace';
+    ctx.fillText(`masaYuksekligi: ${kol.masaYuksekligi}`, canvas.width - 170, masaPx - 6);
+
+    // Zemin
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, tabanY, canvas.width, 50);
+    ctx.fillStyle = '#2a2a3e';
+    ctx.fillRect(0, tabanY, canvas.width, 3);
+
+    // Taban (ray)
+    ctx.fillStyle = '#3a4a5a';
+    ctx.fillRect(100, tabanY - 8, 500, 8);
+
+    // Kol pozisyonu hesapla
+    const kolX = tabanX + kol.x * birimX;
+    const kolY = tabanY - kol.y * birimY;
+
+    // Kol tabanı (mobil platform)
+    ctx.fillStyle = '#4a5a6a';
+    ctx.fillRect(kolX - 20, tabanY - 20, 40, 20);
+
+    // Dikey kol (gövde)
+    const govdeUst = kolY - 60;
+    ctx.strokeStyle = carpiyor ? '#ff4444' : '#7a8a9a';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(kolX, tabanY - 20);
+    ctx.lineTo(kolX, govdeUst);
+    ctx.stroke();
+
+    // Dirsek noktası
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath();
+    ctx.arc(kolX, govdeUst, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Yatay kol (açıya göre)
+    const kolUzunluk = 50;
+    const rad = (kol.aci * Math.PI) / 180;
+    const ucX = kolX + Math.cos(rad) * kolUzunluk;
+    const ucY = govdeUst - Math.sin(rad) * kolUzunluk;
+
+    ctx.strokeStyle = carpiyor ? '#ff4444' : '#a0b0c0';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(kolX, govdeUst);
+    ctx.lineTo(ucX, ucY);
+    ctx.stroke();
+
+    // Pençe
+    const penceBoyut = 10;
+    if (kol.tutuyorMu) {
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(ucX - 4, ucY);
+        ctx.lineTo(ucX, ucY + penceBoyut);
+        ctx.lineTo(ucX + 4, ucY);
+        ctx.stroke();
+    } else {
+        ctx.strokeStyle = '#a0b0c0';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(ucX - 8, ucY);
+        ctx.lineTo(ucX - 2, ucY + penceBoyut);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ucX + 8, ucY);
+        ctx.lineTo(ucX + 2, ucY + penceBoyut);
+        ctx.stroke();
+    }
+
+    // Açı göstergesi
+    if (kol.aci !== 0) {
+        ctx.strokeStyle = 'rgba(0, 255, 136, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(kolX, govdeUst, 20, 0, -rad, true);
+        ctx.stroke();
+    }
+
+    // Çarpışma animasyonu
+    if (carpiyor) {
+        carpismaFrame++;
+        if (carpismaFrame < 20) {
+            requestAnimationFrame(ciz);
+        } else {
+            carpiyor = false;
+        }
+    }
+
+    // Durum paneli güncelle
+    durumPanel.innerHTML = `
+        <span class="label">x:</span> <span class="value">${kol.x}</span><br>
+        <span class="label">y:</span> <span class="value">${kol.y}</span><br>
+        <span class="label">açı:</span> <span class="value">${kol.aci}°</span><br>
+        <span class="label">tutuyor mu:</span> <span class="value">${kol.tutuyorMu ? 'evet ✊' : 'hayır ✋'}</span><br>
+        <span class="label">masa yüks.:</span> <span class="value">${kol.masaYuksekligi}</span><br>
+        <br>
+        ${hata ? `<span class="value error">⚠ ${hata}</span>` : '<span class="value">✅ Sistem normal</span>'}
+    `;
+}
+
+async function animasyonBaslat() {
+    sifirla();
+    const bekle = ms => new Promise(r => setTimeout(r, ms));
+
+    await bekle(800);
+    yukariKalk(4); await bekle(600);
+    sagaGit(3); await bekle(600);
+    dondir(); await bekle(600);
+    solaGit(5); await bekle(600);
+    asagiIn(4); await bekle(600);
+    tutBirak(); await bekle(1000);
+
+    // Şimdi masayı değiştir
+    masayiDegistir(); await bekle(1200);
+
+    // Aynı hareketi dene — çarpışma!
+    yukariKalk(4);
+}
+
+// İlk çizim
+ciz();
+</script>
+</body>
+</html>
